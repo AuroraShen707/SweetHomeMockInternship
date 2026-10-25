@@ -783,6 +783,65 @@ public class FurnitureTable extends JTable implements View, Printable {
   }
 
   /**
+   * Prints this component with specific columns, even if they are hidden on screen.
+   */
+  public int print(Graphics g, PageFormat pageFormat, int pageIndex,
+                   List<HomePieceOfFurniture.SortableProperty> visibleProperties) throws PrinterException {
+    DefaultTableColumnModel printableColumnModel = new DefaultTableColumnModel();
+    final DefaultTableCellRenderer defaultRenderer = new DefaultTableCellRenderer();
+    defaultRenderer.setHorizontalAlignment(DefaultTableCellRenderer.CENTER);
+
+    TableCellRenderer printableHeaderRenderer = new TableCellRenderer() {
+      public Component getTableCellRendererComponent(JTable table, Object value,
+                                                     boolean isSelected, boolean hasFocus, int row, int column) {
+        JLabel headerRendererLabel = (JLabel)defaultRenderer.getTableCellRendererComponent(table, value,
+                isSelected, hasFocus, row, column);
+        headerRendererLabel.setIcon(null);
+        headerRendererLabel.setBackground(Color.LIGHT_GRAY);
+        headerRendererLabel.setForeground(Color.BLACK);
+        headerRendererLabel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Color.BLACK),
+                headerRendererLabel.getBorder()));
+        return headerRendererLabel;
+      }
+    };
+
+    FurnitureTableColumnModel columnModel = (FurnitureTableColumnModel)getColumnModel();
+
+    for (HomePieceOfFurniture.SortableProperty property : visibleProperties) {
+      final TableColumn tableColumn = columnModel.getAvailableColumn(property);
+      if (tableColumn == null) {
+        continue; // Skip if the property isn't available
+      }
+
+      TableColumn printableColumn = new TableColumn();
+      printableColumn.setIdentifier(tableColumn.getIdentifier());
+      printableColumn.setHeaderValue(tableColumn.getHeaderValue());
+
+      TableCellRenderer printableCellRenderer = new TableCellRenderer() {
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                                                       boolean isSelected, boolean hasFocus, int row, int column) {
+          TableCellRenderer cellRenderer = tableColumn.getCellRenderer();
+          Component rendererComponent = cellRenderer.getTableCellRendererComponent(table, value,
+                  isSelected, hasFocus, row, column);
+          if (rendererComponent instanceof JCheckBox) {
+            rendererComponent = defaultRenderer.getTableCellRendererComponent(table,
+                    ((JCheckBox)rendererComponent).isSelected() ? "x" : "", false, false, row, column);
+          }
+          rendererComponent.setBackground(Color.WHITE);
+          rendererComponent.setForeground(Color.BLACK);
+          return rendererComponent;
+        }
+      };
+
+      printableColumn.setCellRenderer(printableCellRenderer);
+      printableColumn.setHeaderRenderer(printableHeaderRenderer);
+      printableColumnModel.addColumn(printableColumn);
+    }
+    return print(g, pageFormat, pageIndex, printableColumnModel, Color.BLACK);
+  }
+
+  /**
    * Prints this table in Event Dispatch Thread.
   */
   private int print(final Graphics g, 
@@ -921,6 +980,9 @@ public class FurnitureTable extends JTable implements View, Printable {
           case HEIGHT : 
             writer.write(sizeFormat.format(copiedPiece.getHeight()));
             break;
+          case VOLUME :
+            writer.write(sizeFormat.format(copiedPiece.getVolume()));
+            break;
           case X : 
             writer.write(sizeFormat.format(copiedPiece.getX()));
             break;
@@ -1012,6 +1074,10 @@ public class FurnitureTable extends JTable implements View, Printable {
       addHomeListener(home);
       addLanguageListener(preferences);
       updateModelColumns(home.getFurnitureVisibleProperties());
+    }
+
+    TableColumn getAvailableColumn(HomePieceOfFurniture.SortableProperty property) {
+      return this.availableColumns.get(property);
     }
 
     /**
@@ -1130,6 +1196,8 @@ public class FurnitureTable extends JTable implements View, Printable {
           return preferences.getLocalizedString(FurnitureTable.class, "depthColumn");
         case HEIGHT : 
           return preferences.getLocalizedString(FurnitureTable.class, "heightColumn");
+        case VOLUME :
+          return preferences.getLocalizedString(FurnitureTable.class, "volumeColumn");
         case X : 
           return preferences.getLocalizedString(FurnitureTable.class, "xColumn");
         case Y :
@@ -1173,7 +1241,8 @@ public class FurnitureTable extends JTable implements View, Printable {
           return 120; 
         case WIDTH :
         case DEPTH :
-        case HEIGHT : 
+        case HEIGHT :
+        case VOLUME :
         case X : 
         case Y :
         case ELEVATION : 
@@ -1215,6 +1284,8 @@ public class FurnitureTable extends JTable implements View, Printable {
           return getSizeRenderer(HomePieceOfFurniture.SortableProperty.DEPTH, preferences);
         case HEIGHT : 
           return getSizeRenderer(HomePieceOfFurniture.SortableProperty.HEIGHT, preferences);
+        case VOLUME :
+          return getSizeRenderer(HomePieceOfFurniture.SortableProperty.VOLUME, preferences);
         case X : 
           return getSizeRenderer(HomePieceOfFurniture.SortableProperty.X, preferences);
         case Y :
@@ -1341,6 +1412,16 @@ public class FurnitureTable extends JTable implements View, Printable {
                     isSelected, hasFocus, row, column);
               }
             };
+        case VOLUME :
+          return new SizeRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table,
+                                                           Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+              return super.getTableCellRendererComponent(table,
+                      value != null  ? ((HomePieceOfFurniture)value).getVolume()  : null,
+                      isSelected, hasFocus, row, column);
+            }
+          };
         case X :
           return new SizeRenderer() {
               @Override
